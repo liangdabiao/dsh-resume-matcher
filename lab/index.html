@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>简历诊所</title>
+<script src="scheme.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200..700&family=Noto+Sans+SC:wght@200..700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <a class="brand" href="#/">
+      <img class="brand-logo" src="icon.svg" alt="">
+      <span><span class="brand-name">简历诊所</span><span class="brand-sub">dsh-resume-matcher</span></span>
+    </a>
+    <nav class="nav" aria-label="导航">
+      <div class="nav-group">档案</div>
+      <a href="#/" data-view="home"><i data-icon="home"></i>概览</a>
+      <a href="#/resumes" data-view="resumes"><i data-icon="doc"></i>简历库<span class="nav-count" data-count="resumes"></span></a>
+      <a href="#/jobs" data-view="jobs"><i data-icon="briefcase"></i>岗位库<span class="nav-count" data-count="jobs"></span></a>
+      <a href="#/reports" data-view="reports"><i data-icon="report"></i>分析报告<span class="nav-count" data-count="reports"></span></a>
+      <div class="nav-group">动作</div>
+      <a href="#/start" data-view="start"><i data-icon="spark"></i>发起分析</a>
+    </nav>
+    <div class="rail-foot" id="rail-foot"></div>
+  </aside>
+  <main class="main" id="app"><div class="loading">LOADING…</div></main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

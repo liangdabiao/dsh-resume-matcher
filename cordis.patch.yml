@@ -1,0 +1,5 @@
+# 简历诊所：hr-critic 技能（五步 HR 审计方法论）+ resume_matcher 档案工具 + 侧栏面板。
+# 浏览器半边由 dsh.client 声明加载。
+- insert:
+    - id: resume-matcher
+      name: 'dsh-resume-matcher'
