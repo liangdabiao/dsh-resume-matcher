@@ -110,6 +110,21 @@ const rawCall = (url, opts) => new Promise((resolve) => {
   check('非前缀请求被拒', res.statusCode === 404, `status=${res.statusCode}`)
 }
 {
+  // 面板页 lab/index.html 引用包根目录的 icon.svg（曾 404，品牌位是破图）
+  const res = await call('/resume-matcher/icon.svg')
+  check('品牌图标 /resume-matcher/icon.svg', res.statusCode === 200 && res.body.includes('<svg'), `status=${res.statusCode} ${Buffer.byteLength(res.body)}B`)
+}
+{
+  // 设计 token 自检：CSS 里 var() 引用不存在的自定义属性会让整条声明静默失效
+  // （曾经 --sp-12 未定义，导致 .main 的四边 padding 全丢、正文贴着左侧导航）
+  const { readFileSync } = await import('node:fs')
+  const css = readFileSync(new URL('../lab/style.css', import.meta.url), 'utf8')
+  const defined = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))
+  const used = new Set([...css.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]))
+  const missing = [...used].filter((k) => !defined.has(k))
+  check('CSS 自定义属性都有定义', missing.length === 0, missing.join(', '))
+}
+{
   // URL 构造器会规范化明文 ../，真实攻击形态是编码 %2e%2e（解码发生在前缀剥离之后）
   const res = await call(encodeURI('/resume-matcher/../package.json').replace(/\.\./g, '%2e%2e'))
   check('路径穿越被拒', res.statusCode === 404, `status=${res.statusCode}`)
@@ -161,6 +176,44 @@ const rawCall = (url, opts) => new Promise((resolve) => {
   const upJob = cat.jobs.find((j) => j.id === addJ.id)
   check('新档案标记未结构化', upResume && !upResume.processed_at && upJob && !upJob.processed_at)
   check('上传后清单数正确', cat.stats.resumes === 2 && cat.stats.jobs === 1)
+}
+
+// ── 4. 浏览器半边：dist/client.js 在宿主 ModuleLoader 下能注册并装配 ────
+// 宿主 boot 时同一 id 注册两次会整站白屏，所以这一条值得每次冒烟都跑。
+{
+  const { readFileSync } = await import('node:fs')
+  const vm = await import('node:vm')
+  const code = readFileSync(new URL('../dist/client.js', import.meta.url), 'utf8')
+  const registered = []
+  const sandbox = {
+    window: { __ModuleLoader__: { load: (def) => registered.push(def) } },
+    location: { origin: 'http://127.0.0.1:50492' },
+    console,
+    addEventListener() {},
+    removeEventListener() {},
+  }
+  sandbox.globalThis = sandbox
+  vm.createContext(sandbox)
+  vm.runInContext(code, sandbox)
+  check('client bundle 只注册一次', registered.length === 1 && registered[0].id === 'dsh-resume-matcher', `registered=${registered.length}`)
+
+  const react = { createElement: (type, props, ...children) => ({ type, props, children }), useRef: () => ({ current: null }), useEffect() {} }
+  const exported = registered[0].factory((spec) => {
+    if (spec === 'react') return react
+    throw new Error(`client 产物 require 了白名单外的模块：${spec}`)
+  })
+  check('client bundle 导出 isPlugin + apply', exported.isPlugin === true && typeof exported.apply === 'function')
+
+  const slots = []
+  exported.apply({
+    inject: (names, cb) => cb({ theme: { getTheme: () => ({ active: { colorScheme: 'dark' } }) }, on() {} }),
+    slots: { inject: (name, cb) => cb(), register: (def) => slots.push(def) },
+    uiWorkspace: { startSession() {} },
+  })
+  check('侧栏入口 + 主区域都注册了',
+    slots.some((s) => s.name === 'sidebar.panellist' && s.id === 'resume-matcher') &&
+    slots.some((s) => s.name === 'main' && s.key === 'resume-matcher'),
+    slots.map((s) => `${s.name}:${s.id || s.key}`).join(' '))
 }
 
 rmSync(tmp, { recursive: true, force: true })

@@ -11,7 +11,7 @@ import {
   saveResume, saveJob, saveReport, getResume, getJob, getReport,
   listResumes, listJobs, listReports, removeResume, removeJob, removeReport,
   updateResume, updateJob,
-  parseProcessed, getLastResumeId, getLastJobId, stats, DATA_DIR,
+  parseProcessed, getLastResumeId, getLastJobId,
 } from '../lib/store.js'
 
 export const name = 'resume-matcher' // = cordis.patch.yml 的 id
@@ -85,14 +85,12 @@ export const resumeMatcherTool = {
       path: str('parse：简历文件的绝对路径（.pdf / .docx）'),
       rawText: str('save_resume：简历纯文本（parse 的结果或用户粘贴的原文）'),
       processedJson: str('save_resume/save_job：结构化信息 JSON 字符串（按 hr-critic 技能里的 schema；可选，但建议总是提供）'),
-      resumeId: str('可选：已有档案 id。save_resume 传入则回填更新（面板新增的未结构化档案用这个补 processedJson，不建新档）；save_job / archive_report 传入则建立关联'),
+      resumeId: str('可选：已有简历 id。save_resume 传入则回填更新（面板新增的未结构化档案用这个补 processedJson，不建新档）；save_job / archive_report 传入则建立关联'),
       jobId: str('可选：已有 JD id。save_job 传入则回填更新而不建新档；archive_report 传入则建立关联'),
       sourceFile: str('save_resume：可选，来源文件路径'),
       content: str('save_job：JD 原文（用户粘贴的岗位描述文本）'),
       kind: str('list/get/remove：档案类型', { enum: KINDS }),
       id: str('get/remove：档案 id（list 里能看到）'),
-      resumeId: str('archive_report：关联的简历 id（save_resume 返回的）'),
-      jobId: str('archive_report：关联的 JD id（save_job 返回的）'),
       reportMd: str('archive_report：五步审计报告 markdown 全文'),
       title: str('archive_report：可选，报告标题；缺省自动生成「简历 × 岗位」'),
       confirm: str('remove 删除档案必须传 "yes"（删简历会级联删其 JD 和报告）', { enum: ['yes'] }),
@@ -152,7 +150,14 @@ export const resumeMatcherTool = {
       if (!args.resumeId && !args.jobId) throw new Error('archive_report 至少需要 resumeId 或 jobId 之一。')
       const id = saveReport({ resumeId: args.resumeId || '', jobId: args.jobId || '', reportMd: args.reportMd, title: args.title })
       const r = getReport(id)
-      const improved = r?.improved_md ? `优化后简历已自动抽取（${r.improved_md.length} 字符），面板可一键复制。` : '报告中没检测到 ```md 代码块，未抽取优化后简历（建议 Step 4 用 ```md 包住完整简历）。'
+      // 三种来源分开说：抽到 / 兜底拼装 / 完全没有。兜底稿不是模型的 Step 4 重写，
+      // 说成「已自动抽取」会让用户以为拿到的是优化稿。
+      const improved =
+        r?.improved_source === 'extracted'
+          ? `优化后简历已自动抽取（${r.improved_md.length} 字符），面板可一键复制。`
+          : r?.improved_source === 'fallback'
+            ? `报告里没检测到可用的 \`\`\`md 代码块，已用结构化抽取结果兜底拼装了一份优化后简历（${r.improved_md.length} 字符）——质量和你的 Step 4 重写稿没法比。建议把完整简历单独放进 \`\`\`md 代码块后重新 archive_report。`
+            : '报告中没检测到 ```md 代码块，未抽取优化后简历（建议 Step 4 用 ```md 包住完整简历）。'
       return result(true,
         `报告已存档：reportId=${id}（${r?.title || ''}）。${improved} 把报告全文完整输出给用户，并提醒可在侧栏「简历诊所」查看。`)
     }
@@ -228,5 +233,5 @@ export function apply(ctx, config) {
   ctx.effect(() => ctx.skills.registerProvider(() => createSkillProvider(skillDirs)), `${name}: skills`)
   ctx.effect(() => ctx.systemPrompt.section(systemSection()), `${name}: workflow`)
 
-  ctx.effect(() => registerApi(ctx, { dataDir: DATA_DIR, statsFn: stats }), `${name}: routes`)
+  ctx.effect(() => registerApi(ctx), `${name}: routes`)
 }

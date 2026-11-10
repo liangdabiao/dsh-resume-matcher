@@ -4,6 +4,11 @@ DeepSeek Harness（dsh）插件：HR 视角的中文简历深度优化工作台�
 
 移植自开源项目 [resume-matcher-agent-cn](https://github.com/)（HR批评简历，Flask + Next.js），本插件为其 dsh 化形态：**纯技能驱动、零 API key、零 Python 依赖**。
 
+![dashboard](pics/1.png)
+![dashboard](pics/2.png)
+![dashboard](pics/3.png)
+![dashboard](pics/4.png)
+
 ## 核心功能
 
 - 📄 **解析归档**：`resume_matcher` 工具解析 PDF / DOCX 简历（含双列布局保序），结构化信息 JSON 归档
@@ -69,11 +74,24 @@ node scripts/devserver.mjs 5175                     # http://127.0.0.1:5175/resu
 - a4cv 编辑器内置的「AI 优化」需在编辑器内自行配置模型 API（与插件本体零 API key 无关）
 - v2 已完成 a4cv 集成；后续可选：内置 OpenAI 兼容客户端（面板一键重跑）
 
+## 更新日志
+
+- **0.3.1**（2026-11-10）安装后实测修复：
+  - 面板主区四边内边距恢复（`--sp-12` 未定义让整条 `padding` 声明失效，正文贴着左侧导航）
+  - 短优化简历（Step 4 有 ≤1000 字预算）不再被「长度 > 150」门槛误判——优化稿不会被结构化兜底稿顶替
+  - 报告回执区分「已抽取 / 兜底拼装 / 未抽取」，不再把兜底稿说成优化稿
+  - `resume_matcher` 参数的 `resumeId` / `jobId` 重复定义合并（`save_resume` 的回填说明不再被覆盖）
+  - 面板品牌图标 `/resume-matcher/icon.svg` 补上路由（原先 404 破图）
+  - 结构化归档：camelCase 输入（`personalData` 等）不再被同义别名静默清空
+  - DOCX 表格排版（个人信息表）按「单元格 = tab / 行 = 换行」输出，不再挤成一竖条
+- **0.3.0** 初版：五步审计技能 + 档案工具 + 侧栏「简历诊所」面板 + a4cv 编辑器集成
+
 ## 致谢
 
 - [resume-matcher-agent-cn](https://github.com/)：五步审计 prompt、双列 DOCX 解析、启发式简历抽取与 a4cv 归一化均移植自该项目
 - [a4cv（阿真的开源简历编辑器）](https://github.com/irenerachel/a4cv)：可视化简历编辑器，本插件原样集成其静态资源
 - [dsh-guizang-design](https://github.com/op7418/dsh-guizang-design)：面板瑞士风设计系统与插件形态参考
+- [linux.do](https://linux.do/)：社区支持
 
 ## License
 

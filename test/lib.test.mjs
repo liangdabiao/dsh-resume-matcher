@@ -251,4 +251,48 @@ test('parser: extractFromBuffer 拒绝非支持扩展名', async () => {
   await assert.rejects(() => extractFromBuffer(Buffer.from('x'), '.doc'), /只支持/)
 })
 
+// ── 回归：短简历的优化稿必须能抽出来（曾因长度门槛被静默丢弃）──────
+test('markdown: 128 字的短优化简历也能抽出（不再回退到结构化兜底）', () => {
+  const block = '苏明远\n\n**工作经历**\n\n- 为解决 AI 写作产品冷启动问题，在「模板引导」与「样例生成」间选后者，首周留存提升 18%\n- 主导 RAG 检索链路重构，将答案命中率从 62% 提升至 81%\n\n**教育背景**\n\n复旦大学 信息管理与商业分析 硕士'
+  const report = `## Step 1 · 第一印象\n\n匹配 7/10。\n\n## Step 4 · 修改后的完整简历\n\n\`\`\`md\n${block}\n\`\`\`\n\n## Step 5 · 最终裁决\n\n可投。`
+  const [md, source] = extractImprovedMd(report)
+  assert.equal(source, 'extracted')
+  assert.equal(md, block)
+})
+
+test('markdown: 多个代码块时挑最像简历的那个，示例片段不冒充', () => {
+  const report = '## Step 3 · 修改蓝图\n\n改前示例：\n\n```\n工作经历：负责XX\n```\n\n' +
+    '## Step 4 · 修改后的完整简历\n\n```md\n张三\n\n## 工作经历\n\n- 做了A\n\n## 教育背景\n\n本科\n```'
+  const [md, source] = extractImprovedMd(report)
+  assert.equal(source, 'extracted')
+  assert.match(md, /^张三/)
+  assert.match(md, /## 教育背景/)
+})
+
+test('markdown: 只有小节关键词、没有结构的短片段不当简历', () => {
+  assert.deepEqual(extractImprovedMd('```\n工作经历：随便写点\n```'), [null, 'none'])
+})
+
+// ── 回归：DOCX 表格（个人信息表是中文简历的高频排版）─────────────────
+test('parser: DOCX 表格按 单元格=tab / 行=换行 输出，不把一格挤成一竖条', () => {
+  const table =
+    '<w:tbl><w:tblPr/>' +
+    '<w:tr><w:tc><w:p><w:r><w:t>姓名</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>苏明远</w:t></w:r></w:p></w:tc></w:tr>' +
+    '<w:tr><w:tc><w:p><w:r><w:t>手机</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>13800000000</w:t></w:r></w:p></w:tc></w:tr>' +
+    '</w:tbl>'
+  const xml = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' +
+    table + '<w:p><w:r><w:t>工作经历</w:t></w:r></w:p></w:body></w:document>'
+  const text = extractDocx(docxZip(xml))
+  assert.match(text, /姓名\t苏明远\n手机\t13800000000/)
+  assert.match(text, /工作经历/)
+  assert.ok(!text.includes('姓名苏明远'))
+})
+
+// ── 回归：只给了个人信息的简历也算简历 schema ─────────────────────────
+test('store: 只有 personalData 的 processedJson 仍按简历 schema 归一化', () => {
+  const p = store.parseProcessed({ personalData: { lastName: '王', firstName: '五' } })
+  assert.equal(p.personal_data.lastName, '王')
+  assert.equal(p.personal_data.firstName, '五')
+})
+
 test.after ?? test.after(() => rmSync(tmp, { recursive: true, force: true }))

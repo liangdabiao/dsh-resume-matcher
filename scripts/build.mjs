@@ -47,6 +47,9 @@ await build({
   minify: !process.argv.includes('--watch'),
   sourcemap: process.argv.includes('--watch') ? 'inline' : false,
   logLevel: 'info',
+  // 包是 type:module，但 client.js 走 banner 里的 CJS 包装（exports/module 由 banner 提供），
+  // 这条警告是预期内的噪声，关掉免得每次构建都以为出了问题。
+  logOverride: { 'commonjs-variable-in-esm': 'silent' },
 })
 
 if (!process.argv.includes('--watch')) {
