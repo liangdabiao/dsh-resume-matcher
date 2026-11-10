@@ -185,4 +185,53 @@ test('store: parse 已存档案路径形状（list 排序/标题兜底）', () =
   store.removeResume(rid)
 })
 
+// ── a4cv 对接 ──────────────────────────────────────────────────────────
+const { normalizeForA4cv, buildFallbackMarkdown, countSections } = await import('../lib/a4cv.js')
+
+test('a4cv: 加粗小节标题转 ## + 首行补 # 姓名', () => {
+  const md = normalizeForA4cv('苏明远\n\n**工作经历**\n\n- 内容一\n\n**技能：**\n\n- Go\n')
+  assert.match(md, /^# 苏明远\n/)
+  assert.match(md, /## 工作经历/)
+  assert.match(md, /## 技能/)
+  assert.ok(!md.includes('**工作经历'))
+})
+
+test('a4cv: 联系方式行不当姓名、已有 # 标题不动', () => {
+  assert.equal(normalizeForA4cv('# 张三\n正文'), '# 张三\n正文')
+  const contact = normalizeForA4cv('13800000000\n正文')
+  assert.ok(!contact.startsWith('# 13800000000'))
+  assert.match(contact, /^13800000000\n/)
+})
+
+test('a4cv: fallback 从 processed 拼装（snake/驼峰键都吃）', () => {
+  const md = buildFallbackMarkdown({
+    personal_data: { firstName: 'Yuan', lastName: 'Ce', email: 'c@x.com', location: { city: '上海' } },
+    experiences: [{ job_title: '工程师', company: 'A', start_date: '2020-01', end_date: 'Present', description: ['做了X'] }],
+    projects: [{ projectName: 'P1', description: '为解决Y选Z' }],
+    education: [{ institution: '某大学', degree: '本科' }],
+    skills: [{ skillName: 'Go' }, { skillName: 'Redis' }],
+    achievements: ['国奖'],
+  })
+  assert.match(md, /^# CeYuan/)
+  assert.match(md, /> c@x\.com · 上海/)
+  assert.match(md, /## 工作经历\n### 工程师 \| A · 2020-01 - Present/)
+  assert.match(md, /## 项目经历/)
+  assert.match(md, /## 技能标签\nGo · Redis/)
+  assert.match(md, /## 证书与荣誉\n- 国奖/)
+  assert.equal(countSections(md), 9) // 姓名 + 5 小节 + 3 ### 条目
+})
+
+test('a4cv: store 存报告时 improved_md 已归一化 + fallback 源', () => {
+  const rid = store.saveResume({
+    content: '# 老简历',
+    processed: { personal_data: { firstName: 'San', lastName: 'Zhang' }, experiences: [] },
+  })
+  const reportId = store.saveReport({ resumeId: rid, reportMd: '## Step 4\n\n没有代码块的报告' })
+  const r = store.getReport(reportId)
+  assert.equal(r.improved_source, 'fallback')
+  assert.match(r.improved_md, /^# ZhangSan/)
+  assert.ok(r.improved_sections >= 1)
+  store.removeResume(rid) // 级联删报告
+})
+
 test.after ?? test.after(() => rmSync(tmp, { recursive: true, force: true }))

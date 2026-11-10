@@ -61,6 +61,8 @@
     back: '<path d="M14 6l-6 6 6 6"/>',
     go: '<path d="M9 6l6 6-6 6"/>',
     trash: '<path d="M5 7h14"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
+    open: '<path d="M14 4h6v6"/><path d="M20 4L10 14"/><path d="M18 13v7H4V6h7"/>',
     copy: '<rect x="8" y="8" width="12" height="12"/><path d="M16 8V4H4v12h4"/>',
     download: '<path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>',
   }
@@ -279,7 +281,8 @@
         <div class="detail-head">
           <h1>${esc(r.title)}</h1>
           <div class="actions">
-            ${r.improved_md ? `<button class="btn accent" data-copy="${esc(r.improved_md)}" data-msg="优化后简历已复制">${ic('copy')}复制优化简历</button>` : ''}
+            ${r.improved_md ? `<a class="btn accent" href="#/editor/${esc(id)}">${ic('edit')}编辑器微调</a>` : ''}
+            ${r.improved_md ? `<button class="btn ghost" data-copy="${esc(r.improved_md)}" data-msg="优化后简历已复制">${ic('copy')}复制</button>` : ''}
             <button class="btn ghost" data-dl-report="${esc(id)}" data-name="${esc(safeName)}">${ic('download')}下载报告</button>
             <button class="ibtn" data-del="reports" data-id="${esc(id)}" title="删除报告">${ic('trash')}</button>
           </div>
@@ -298,6 +301,42 @@
             </div></div>
           <pre>${esc(r.improved_md)}</pre></div>` : ''}
         <div class="article">${r.html || '<p>（报告内容为空）</p>'}</div>`
+    })
+  }
+
+  // ---------- 视图：a4cv 编辑器 ----------
+  // 投递通道（a4cv 内置 pickupResumeFromOptimizer，init 时最高优先级）：
+  //   主：同源 sessionStorage('pendingResumeMD') + ?pickup=session
+  //   辅：新窗口 ?md=<urlencoded>
+  function viewEditor(id) {
+    return page(async () => {
+      const { report: r } = await api(`/api/report?id=${encodeURIComponent(id)}`)
+      if (!r.improved_md) throw new Error('这份报告没有可编辑的优化简历（Step 4 需要 ```md 代码块）')
+      const md = r.improved_md
+      return [`
+        <div class="editor-wrap">
+          <div class="editor-bar">
+            <a class="back" href="#/report/${esc(id)}" style="margin-bottom:0">${ic('back')} 返回报告</a>
+            <span class="editor-title">${esc(r.title)} · a4cv 可视化微调</span>
+            <div class="actions">
+              <button class="btn ghost" data-copy="${esc(md)}" data-msg="优化后简历已复制">${ic('copy')}复制 MD</button>
+              <button class="btn ghost" id="a4cv-open">${ic('open')}新窗口</button>
+            </div>
+          </div>
+          <iframe class="editor-frame" id="a4cv-frame" src="about:blank" title="a4cv 可视化简历编辑器" style="border:0;display:block;background:var(--paper)"></iframe>
+        </div>`,
+      () => {
+        // 渲染后再投递：先写 sessionStorage 再换 src，a4cv init 时 pickup 命中
+        const frame = document.getElementById('a4cv-frame')
+        if (frame) {
+          try { sessionStorage.setItem('pendingResumeMD', md) } catch {}
+          frame.src = '/resume-matcher/a4cv/index.html?pickup=session'
+        }
+        const open = document.getElementById('a4cv-open')
+        if (open) open.onclick = () => {
+          try { window.open(`/resume-matcher/a4cv/index.html?md=${encodeURIComponent(md)}`, '_blank') } catch {}
+        }
+      }]
     })
   }
 
@@ -399,11 +438,16 @@
     return (r.content || '').split('\n').map((s) => s.trim()).find(Boolean)?.slice(0, 40) || '未命名简历'
   }
 
-  // async 视图包装：先放 loading，取数后渲染；失败显示空态（首次打开无数据不白屏）
+  // async 视图包装：先放 loading，取数后渲染；loader 可返回 [html, afterRender]。
+  // 失败显示空态（首次打开无数据不白屏）。
   function page(loader) {
     $app.innerHTML = '<div class="loading">LOADING…</div>'
-    loader().then((html) => { $app.innerHTML = html; bindDetail() })
-      .catch((e) => { $app.innerHTML = `<div class="empty"><div class="e-title">加载失败</div><p>${esc(e.message)}</p></div>` })
+    loader().then((result) => {
+      const [html, after] = Array.isArray(result) ? result : [result, null]
+      $app.innerHTML = html
+      bindDetail()
+      if (after) after()
+    }).catch((e) => { $app.innerHTML = `<div class="empty"><div class="e-title">加载失败</div><p>${esc(e.message)}</p></div>` })
   }
 
   function bindDetail() {
@@ -451,16 +495,19 @@
       hash.match(/^#\/resume\/([\w-]+)$/) || hash.match(/^#\/resumes\/([\w-]+)$/)
     const mj = hash.match(/^#\/jobs\/([\w-]+)$/)
     const mr = hash.match(/^#\/report\/([\w-]+)$/)
+    const me = hash.match(/^#\/editor\/([\w-]+)$/)
+    $app.classList.toggle('bare', Boolean(me))
     document.querySelectorAll('.nav a').forEach((a) => {
       const cur = hash === '#/' ? 'home' : hash.startsWith('#/start') ? 'start'
         : hash.startsWith('#/resumes') || m ? 'resumes'
         : hash.startsWith('#/jobs') || mj ? 'jobs'
-        : hash.startsWith('#/reports') || hash.startsWith('#/report/') || mr ? 'reports' : 'home'
+        : hash.startsWith('#/reports') || hash.startsWith('#/report/') || hash.startsWith('#/editor/') || mr || me ? 'reports' : 'home'
       a.classList.toggle('on', a.dataset.view === cur)
     })
     if (m) return viewResume(m[1]) // page() 自己负责 innerHTML
     if (mj) return viewJob(mj[1])
     if (mr) return viewReport(mr[1])
+    if (me) return viewEditor(me[1])
     if (hash.startsWith('#/resumes')) $app.innerHTML = viewResumes()
     else if (hash.startsWith('#/jobs')) $app.innerHTML = viewJobs()
     else if (hash.startsWith('#/reports')) $app.innerHTML = viewReports()

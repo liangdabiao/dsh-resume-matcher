@@ -50,6 +50,13 @@ svg.ic { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none
 .rail-foot .v-row span:last-child { text-align: right; }
 
 .main { min-width: 0; padding: var(--sp-8) var(--sp-9) var(--sp-12); max-width: 1180px; }
+/* 编辑器视图：主区退去内边距，iframe 占满 */
+.main.bare { padding: 0; max-width: none; height: 100vh; }
+.editor-wrap { display: flex; flex-direction: column; height: 100vh; }
+.editor-bar { display: flex; align-items: center; gap: var(--sp-5); padding: var(--sp-3) var(--sp-5); background: var(--paper); border-bottom: 1px solid var(--line-subtle); }
+.editor-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editor-bar .actions { margin-left: auto; display: flex; gap: var(--sp-2); }
+.editor-frame { flex: 1; width: 100%; }
 
 /* ---------- 页头：方括号小标签 + 细体大标题 ---------- */
 .eyebrow { display: inline-block; position: relative; padding: 3px 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; color: var(--text-secondary); }

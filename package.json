@@ -1,6 +1,6 @@
 {
   "name": "dsh-resume-matcher",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "简历诊所 · HR 视角深度简历优化：解析 PDF/DOCX 简历与岗位 JD，五步审计（第一印象/地毯式审计/修改蓝图/重写简历/最终裁决），报告与优化后简历存档，侧栏「简历诊所」面板管理。纯技能零 API key，分析由会话模型完成。",
   "license": "MIT",
   "type": "module",
@@ -19,6 +19,7 @@
     "lib",
     "lab",
     "skills",
+    "a4cv",
     "locale/*.json",
     "cordis.patch.yml",
     "icon.svg",
