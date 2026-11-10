@@ -33,7 +33,7 @@ DeepSeek Harness（dsh）插件：HR 视角的中文简历深度优化工作台�
 
 ```bash
 # dsh 0.2.x：把仓库 clone 到本地后以 link 方式安装
-dsh plugin add <本仓库本地路径>
+dsh plugin add https://github.com/liangdabiao/dsh-resume-matcher
 ```
 
 依赖会自动安装（`@deepseek-ai/schemastery`、`unpdf`）。数据存放在 `~/.dsh/resume-matcher/`（可用 `DSH_HOME` 改）。
