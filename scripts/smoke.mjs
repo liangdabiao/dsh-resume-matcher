@@ -142,6 +142,27 @@ const rawCall = (url, opts) => new Promise((resolve) => {
   check('404 分支', nf.statusCode === 404)
 }
 
+// 新增通道：上传（真实 DOCX base64）/ 粘贴 / JD 新增
+{
+  const { readFileSync } = await import('node:fs')
+  const docxB64 = readFileSync(sample, null).toString('base64')
+  const up = JSON.parse((await call('/api/resume/upload', { method: 'POST', body: { name: '样例简历.docx', base64: docxB64 } })).body)
+  check('上传 DOCX 归档', up.ok === true && up.chars > 200, `chars=${up.chars}`)
+  const bad = await call('/api/resume/upload', { method: 'POST', body: { name: 'x.exe', base64: 'AAAA' } })
+  check('上传扩展名拦截', bad.statusCode === 400)
+  const addR = JSON.parse((await call('/api/resume/add', { method: 'POST', body: { content: '粘贴的简历全文内容' } })).body)
+  check('粘贴新增简历', addR.ok === true && addR.chars === 9)
+  const empty = await call('/api/resume/add', { method: 'POST', body: { content: '  ' } })
+  check('空文本拦截', empty.statusCode === 400)
+  const addJ = JSON.parse((await call('/api/job/add', { method: 'POST', body: { content: '粘贴的 JD 全文', resumeId: up.id } })).body)
+  check('新增 JD 并关联', addJ.ok === true && addJ.chars > 0)
+  const cat = JSON.parse((await call('/api/catalog')).body)
+  const upResume = cat.resumes.find((r) => r.id === up.id)
+  const upJob = cat.jobs.find((j) => j.id === addJ.id)
+  check('新档案标记未结构化', upResume && !upResume.processed_at && upJob && !upJob.processed_at)
+  check('上传后清单数正确', cat.stats.resumes === 2 && cat.stats.jobs === 1)
+}
+
 rmSync(tmp, { recursive: true, force: true })
 console.log(failed ? `\n${failed} 项失败` : '\n冒烟全部通过')
 process.exit(failed ? 1 : 0)

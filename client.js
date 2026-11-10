@@ -48,6 +48,7 @@ function apply(ctx) {
         if (!m || m.type !== 'resume-matcher:start' || typeof m.prompt !== 'string') return
         try {
           ctx.uiWorkspace.startSession(undefined, { prompt: m.prompt, whenDraftExists: 'replace' })
+          try { frame.contentWindow.postMessage({ type: 'resume-matcher:start-ok' }, location.origin) } catch {}
         } catch (err) {
           console.error('[resume-matcher] 开新对话失败', err)
           try { frame.contentWindow.postMessage({ type: 'resume-matcher:start-failed', message: String((err && err.message) || err) }, location.origin) } catch {}

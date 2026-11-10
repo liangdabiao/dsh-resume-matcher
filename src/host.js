@@ -10,6 +10,7 @@ import { extractFromFile } from '../lib/parser.js'
 import {
   saveResume, saveJob, saveReport, getResume, getJob, getReport,
   listResumes, listJobs, listReports, removeResume, removeJob, removeReport,
+  updateResume, updateJob,
   parseProcessed, getLastResumeId, getLastJobId, stats, DATA_DIR,
 } from '../lib/store.js'
 
@@ -84,6 +85,8 @@ export const resumeMatcherTool = {
       path: str('parse：简历文件的绝对路径（.pdf / .docx）'),
       rawText: str('save_resume：简历纯文本（parse 的结果或用户粘贴的原文）'),
       processedJson: str('save_resume/save_job：结构化信息 JSON 字符串（按 hr-critic 技能里的 schema；可选，但建议总是提供）'),
+      resumeId: str('可选：已有档案 id。save_resume 传入则回填更新（面板新增的未结构化档案用这个补 processedJson，不建新档）；save_job / archive_report 传入则建立关联'),
+      jobId: str('可选：已有 JD id。save_job 传入则回填更新而不建新档；archive_report 传入则建立关联'),
       sourceFile: str('save_resume：可选，来源文件路径'),
       content: str('save_job：JD 原文（用户粘贴的岗位描述文本）'),
       kind: str('list/get/remove：档案类型', { enum: KINDS }),
@@ -112,6 +115,17 @@ export const resumeMatcherTool = {
     if (args.action === 'save_resume') {
       if (!args.rawText && !args.processedJson) throw new Error('save_resume 至少需要 rawText（简历原文）。')
       const processed = parseProcessed(args.processedJson)
+      // 传 resumeId = 回填更新（面板上传/新增的档案通常已占档，别建重复档案）
+      if (args.resumeId) {
+        const rec = updateResume(args.resumeId, {
+          processed,
+          ...(args.rawText ? { content: args.rawText } : {}),
+          ...(args.sourceFile ? { sourceFile: args.sourceFile } : {}),
+        })
+        if (!rec) return result(false, `没有这份简历（resumeId=${args.resumeId}）。去掉 resumeId 会建新档，或先 list kind=resumes 核对。`)
+        return result(true,
+          `简历 ${rec.resume_id} 已回填结构化信息。用户在侧栏「简历诊所」面板能看到。下一步：拿到 JD 后 save_job，然后开始五步审计。`)
+      }
       const id = saveResume({ content: args.rawText || '', sourceFile: args.sourceFile || '', processed })
       return result(true,
         `简历已归档：resumeId=${id}${args.sourceFile ? `（来源 ${args.sourceFile}）` : ''}。用户在侧栏「简历诊所」面板能看到。下一步：拿到 JD 后 save_job，然后开始五步审计。`)
@@ -121,6 +135,12 @@ export const resumeMatcherTool = {
     if (args.action === 'save_job') {
       if (!args.content) throw new Error('save_job 需要 content（JD 原文）。')
       const processed = parseProcessed(args.processedJson)
+      if (args.jobId) {
+        const rec = updateJob(args.jobId, { processed, ...(args.resumeId !== undefined ? { resumeId: args.resumeId } : {}) })
+        if (!rec) return result(false, `没有这条 JD（jobId=${args.jobId}）。去掉 jobId 会建新档，或先 list kind=jobs 核对。`)
+        return result(true,
+          `JD ${rec.job_id} 已回填结构化信息。现在可以开始五步审计：get 读简历和 JD 原文，产出报告后 archive_report 存档。`)
+      }
       const id = saveJob({ content: args.content, resumeId: args.resumeId || getLastResumeId(), processed })
       return result(true,
         `JD 已归档：jobId=${id}。现在可以开始五步审计：get 读简历和 JD 原文，产出报告后 archive_report 存档。`)

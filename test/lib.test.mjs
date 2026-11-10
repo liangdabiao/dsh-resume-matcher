@@ -65,7 +65,7 @@ function docxZip(documentXml, method = 0) {
 }
 
 // ── parser ─────────────────────────────────────────────────────────────
-const { extractDocx, extractFromFile } = await import('../lib/parser.js')
+const { extractDocx, extractFromFile, extractFromBuffer } = await import('../lib/parser.js')
 
 test('parser: DOCX stored 条目（双列布局 tab/br/p 保序）', () => {
   const xml = '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' +
@@ -232,6 +232,23 @@ test('a4cv: store 存报告时 improved_md 已归一化 + fallback 源', () => {
   assert.match(r.improved_md, /^# ZhangSan/)
   assert.ok(r.improved_sections >= 1)
   store.removeResume(rid) // 级联删报告
+})
+
+test('store: updateResume/updateJob 回填（upsert 语义）', () => {
+  const rid = store.saveResume({ content: '面板上传的原文', processed: {} })
+  const backfilled = store.updateResume(rid, { processed: { personal_data: { lastName: '王' } } })
+  assert.equal(backfilled.processed.personal_data.lastName, '王')
+  assert.equal(backfilled.content, '面板上传的原文') // 未传 content 不动原文
+  assert.equal(store.updateResume('nope', { processed: {} }), null)
+  const jid = store.saveJob({ content: '面板粘贴的 JD' })
+  store.updateJob(jid, { processed: { job_title: '后端' }, resumeId: rid })
+  assert.equal(store.getJob(jid).processed.job_title, '后端')
+  assert.equal(store.getJob(jid).resume_id, rid)
+  store.removeResume(rid)
+})
+
+test('parser: extractFromBuffer 拒绝非支持扩展名', async () => {
+  await assert.rejects(() => extractFromBuffer(Buffer.from('x'), '.doc'), /只支持/)
 })
 
 test.after ?? test.after(() => rmSync(tmp, { recursive: true, force: true }))

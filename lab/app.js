@@ -63,6 +63,7 @@
     trash: '<path d="M5 7h14"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/>',
     edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
     open: '<path d="M14 4h6v6"/><path d="M20 4L10 14"/><path d="M18 13v7H4V6h7"/>',
+    upload: '<path d="M12 15V4"/><path d="M7 8l5-5 5 5"/><path d="M5 20h14"/>',
     copy: '<rect x="8" y="8" width="12" height="12"/><path d="M16 8V4H4v12h4"/>',
     download: '<path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>',
   }
@@ -141,15 +142,16 @@
   // ---------- 视图：简历库 ----------
   function viewResumes() {
     const list = state.catalog.resumes
+    const addBtn = `<a class="btn" href="#/add-resume">${ic('upload')}新增简历</a>`
     if (!list.length) {
-      return head('简历库', '简历 / RESUMES') + `<div class="empty"><div class="e-title">还没有归档的简历</div>
-        <p>在对话里把简历 PDF/DOCX 文件或文本发给模型，它会解析、结构化并存档到这里。</p></div>`
+      return head('简历库', '简历 / RESUMES', addBtn) + `<div class="empty"><div class="e-title">还没有归档的简历</div>
+        <p>点右上「新增简历」上传 PDF/DOCX 或粘贴文本；也可以在对话里直接发给模型，它会解析、结构化并存档到这里。</p></div>`
     }
-    return head('简历库', '简历 / RESUMES') + `<div class="rows">${list.map((r) => `
+    return head('简历库', '简历 / RESUMES', addBtn) + `<div class="rows">${list.map((r) => `
       <a class="row" href="#/resume/${esc(r.id)}">
         ${ic('doc')}
         <div class="r-main"><div class="r-title">${esc(r.title)}</div>
-          <div class="r-sub">${esc(r.source_file || '粘贴文本')} · ${r.chars} 字${r.processed_at ? ' · 已结构化' : ''}</div></div>
+          <div class="r-sub">${esc(r.source_file || '粘贴文本')} · ${r.chars} 字${r.processed_at ? ' · 已结构化' : ' · 未结构化'}</div></div>
         <span class="r-meta">${esc(fmtDate(r.created_at))}</span>
         <span class="r-go">${ic('go')}</span>
       </a>`).join('')}</div>`
@@ -196,18 +198,19 @@
             <div class="r-main"><div class="r-title">${esc(x.title)}</div></div>
             ${x.score ? `<span class="score">${esc(x.score)}</span>` : ''}
             <span class="r-meta">${esc(fmtDate(x.created_at))}</span><span class="r-go">${ic('go')}</span></a>`).join('')}</div>`) : ''}
-        <details class="raw block"><summary>简历原文（${r.chars} 字）</summary><pre>${esc(r.content)}</pre></details>`
+        <details class="raw block"><summary>简历原文（${(r.content || '').length} 字）</summary><pre>${esc(r.content)}</pre></details>`
     })
   }
 
   // ---------- 视图：岗位库 ----------
   function viewJobs() {
     const list = state.catalog.jobs
+    const addBtn = `<a class="btn" href="#/add-job">${ic('briefcase')}新增岗位</a>`
     if (!list.length) {
-      return head('岗位库', '岗位 / JOBS') + `<div class="empty"><div class="e-title">还没有归档的 JD</div>
-        <p>在对话里把目标岗位描述（招聘页全文即可）发给模型，它会结构化并存档。有 JD 才能做匹配审计。</p></div>`
+      return head('岗位库', '岗位 / JOBS', addBtn) + `<div class="empty"><div class="e-title">还没有归档的 JD</div>
+        <p>点右上「新增岗位」粘贴招聘页全文；也可以在对话里发给模型让它归档。有 JD 才能做匹配审计。</p></div>`
     }
-    return head('岗位库', '岗位 / JOBS') + `<div class="rows">${list.map((j) => `
+    return head('岗位库', '岗位 / JOBS', addBtn) + `<div class="rows">${list.map((j) => `
       <a class="row" href="#/job/${esc(j.id)}">
         ${ic('briefcase')}
         <div class="r-main"><div class="r-title">${esc(j.title)}</div>
@@ -250,7 +253,7 @@
             <div class="r-main"><div class="r-title">${esc(x.title)}</div></div>
             ${x.score ? `<span class="score">${esc(x.score)}</span>` : ''}
             <span class="r-meta">${esc(fmtDate(x.created_at))}</span><span class="r-go">${ic('go')}</span></a>`).join('')}</div>`) : ''}
-        <details class="raw block"><summary>JD 原文（${j.chars} 字）</summary><pre>${esc(j.content)}</pre></details>`
+        <details class="raw block"><summary>JD 原文（${(j.content || '').length} 字）</summary><pre>${esc(j.content)}</pre></details>`
     })
   }
 
@@ -340,11 +343,141 @@
     })
   }
 
+  // ---------- 视图：新增简历 / 新增岗位 ----------
+  // 面板直接归档：上传文件在本地解析（api /resume/upload），或粘贴文本。结构化抽取由对话模型在分析时回填。
+  function viewAddResume() {
+    return `
+      <a class="back" href="#/resumes">${ic('back')} 简历库</a>
+      <header class="head"><span class="eyebrow">ADD RESUME</span><h1>新增<strong>简历</strong></h1>
+      <p>上传 PDF / DOCX（本地解析提取文本）或粘贴简历全文。归档后即可在「发起分析」里选用；<b>结构化抽取</b>由对话模型在分析时自动回填。</p></header>
+      <div class="form">
+        <div class="tabs">
+          <button class="tab on" data-addtab="upload">${ic('upload')}上传文件</button>
+          <button class="tab" data-addtab="paste">${ic('copy')}粘贴文本</button>
+        </div>
+        <div class="tab-body" id="add-upload">
+          <div class="dropzone" id="dz">
+            <input type="file" id="file-input" accept=".pdf,.docx" hidden>
+            <div class="dz-line">${ic('doc', 'ic dz-ic')}</div>
+            <div class="e-title">点击选择，或把文件拖进来</div>
+            <p>支持 .pdf / .docx，在本地解析，不会上传到任何服务器。扫描件 / 图片型 PDF 提取不到文字。</p>
+          </div>
+          <div class="hint" id="upload-status"></div>
+        </div>
+        <div class="tab-body" id="add-paste" hidden>
+          <div class="field">
+            <label>RESUME TEXT · 简历全文</label>
+            <textarea id="paste-text" rows="12" placeholder="把简历全文粘贴到这里…（个人信息 / 工作经历 / 项目经历 / 教育背景 等）"></textarea>
+          </div>
+          <div><button class="btn accent" id="paste-go">${ic('doc')}归档简历</button></div>
+        </div>
+      </div>`
+  }
+
+  function viewAddJob() {
+    const c = state.catalog
+    const selResume = `<option value="">（不关联）</option>` +
+      c.resumes.map((r) => `<option value="${esc(r.id)}">${esc(r.title)}（${esc(r.id.slice(0, 8))}）</option>`).join('')
+    return `
+      <a class="back" href="#/jobs">${ic('back')} 岗位库</a>
+      <header class="head"><span class="eyebrow">ADD JOB</span><h1>新增<strong>岗位</strong></h1>
+      <p>粘贴目标岗位的招聘页全文（职责、要求、公司信息都算）。归档后即可在「发起分析」里选用；<b>结构化抽取</b>由对话模型在分析时自动回填。</p></header>
+      <div class="form">
+        <div class="field">
+          <label>JD · 岗位描述全文</label>
+          <textarea id="job-text" rows="12" placeholder="把招聘页全文粘贴到这里…（岗位职责 / 任职要求 / 薪资福利 等）"></textarea>
+        </div>
+        <div class="field">
+          <label>RESUME · 关联简历（可选）</label>
+          <select id="job-resume">${selResume}</select>
+          <div class="hint">选了简历就建立关联，方便「发起分析」时配对；不选也行。</div>
+        </div>
+        <div><button class="btn accent" id="job-go">${ic('briefcase')}归档岗位</button></div>
+      </div>`
+  }
+
+  function bufToBase64(buf) {
+    const bytes = new Uint8Array(buf)
+    let bin = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
+    return btoa(bin)
+  }
+
+  function bindAdd() {
+    // 新增简历：tab 切换 + 拖拽/点击上传 + 粘贴归档
+    document.querySelectorAll('[data-addtab]').forEach((t) => {
+      t.onclick = () => {
+        document.querySelectorAll('[data-addtab]').forEach((x) => x.classList.toggle('on', x === t))
+        const upload = document.getElementById('add-upload')
+        const paste = document.getElementById('add-paste')
+        if (upload && paste) { upload.hidden = t.dataset.addtab !== 'upload'; paste.hidden = t.dataset.addtab !== 'paste' }
+      }
+    })
+    const dz = document.getElementById('dz')
+    const fileInput = document.getElementById('file-input')
+    const status = document.getElementById('upload-status')
+    if (dz && fileInput) {
+      dz.onclick = () => fileInput.click()
+      dz.ondragover = (e) => { e.preventDefault(); dz.classList.add('drag') }
+      dz.ondragleave = () => dz.classList.remove('drag')
+      dz.ondrop = (e) => { e.preventDefault(); dz.classList.remove('drag'); if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]) }
+      fileInput.onchange = () => { if (fileInput.files.length) handleFile(fileInput.files[0]) }
+    }
+    async function handleFile(f) {
+      const name = f.name || ''
+      if (!/\.(pdf|docx)$/i.test(name)) { if (status) status.textContent = `暂只支持 .pdf / .docx，收到的是 ${name || '未知文件'}`; return }
+      if (status) status.textContent = `正在解析 ${name}（${(f.size / 1024).toFixed(0)} KB）…`
+      try {
+        const base64 = bufToBase64(await f.arrayBuffer())
+        const r = await apiPost('/api/resume/upload', { name, base64 })
+        if (status) status.textContent = ''
+        toast(`已解析并归档：${r.chars} 字`)
+        await loadCatalog()
+        location.hash = `#/resume/${r.id}`
+      } catch (e) {
+        if (status) status.textContent = ''
+        toast(`上传失败：${e.message}`, true)
+      }
+    }
+    const pasteGo = document.getElementById('paste-go')
+    const pasteText = document.getElementById('paste-text')
+    if (pasteGo && pasteText) {
+      pasteGo.onclick = async () => {
+        const content = pasteText.value.trim()
+        if (!content) { toast('先粘贴简历全文', true); return }
+        try {
+          const r = await apiPost('/api/resume/add', { content })
+          toast(`简历已归档（${r.chars} 字）`)
+          await loadCatalog()
+          location.hash = `#/resume/${r.id}`
+        } catch (e) { toast(`归档失败：${e.message}`, true) }
+      }
+    }
+    // 新增岗位
+    const jobGo = document.getElementById('job-go')
+    const jobText = document.getElementById('job-text')
+    const jobResume = document.getElementById('job-resume')
+    if (jobGo && jobText) {
+      jobGo.onclick = async () => {
+        const content = jobText.value.trim()
+        if (!content) { toast('先粘贴岗位描述全文', true); return }
+        try {
+          const r = await apiPost('/api/job/add', { content, resumeId: jobResume ? jobResume.value : '' })
+          toast(`岗位已归档（${r.chars} 字）`)
+          await loadCatalog()
+          location.hash = `#/job/${r.id}`
+        } catch (e) { toast(`归档失败：${e.message}`, true) }
+      }
+    }
+  }
+
   // ---------- 视图：发起分析 ----------
+  // 与 guizang-design 同款双通道：嵌入 dsh 宿主 → postMessage 开新对话（client.js startSession）；
+  // 独立浏览器预览 → 复制草稿到剪贴板。嵌入态还有 start-ok / start-failed 握手反馈。
   function viewStart() {
     const c = state.catalog
     const sel = (list, ph) => `<option value="">${ph}</option>` +
-      list.map((x) => `<option value="${esc(x.id)}">${esc(x.title)}（${esc(x.id.slice(0, 8))}）</option>`).join('')
+      list.map((x) => `<option value="${esc(x.id)}">${esc(x.title)}（${esc(x.id.slice(0, 8))}${x.processed_at ? '' : ' · 未结构化'}）</option>`).join('')
     const noResume = !c.resumes.length
     const noJob = !c.jobs.length
     return `
@@ -352,24 +485,25 @@
       <header class="head">
         <span class="eyebrow">NEW ANALYSIS</span>
         <h1>发起<strong>五步审计</strong></h1>
-        <p>选一份简历和一个目标岗位，生成分析草稿。点击按钮后会在宿主里开一个<b>新对话</b>并把草稿填进输入框——检查没问题再发送。</p>
+        <p>选一份简历和一个目标岗位，生成分析草稿。<b>嵌入 dsh 时点击按钮会直接开一个新对话</b>并把草稿填进输入框——检查没问题再发送。标记「未结构化」的档案，模型会先补抽取再分析。</p>
       </header>
       <div class="form">
         <div class="field">
-          <label>RESUME · 简历</label>
+          <label>RESUME · 简历 <a class="more-link" href="#/add-resume">+ 新增</a></label>
           <select id="start-resume">${sel(c.resumes, noResume ? '（还没有简历档案）' : '选择简历…')}</select>
-          ${noResume ? '<div class="hint">还没有简历档案：先在对话里发简历文件（PDF/DOCX）或粘贴文本给模型，它会归档。</div>' : ''}
+          ${noResume ? '<div class="hint">还没有简历档案：去<a href="#/add-resume">新增简历</a>（上传 PDF/DOCX 或粘贴文本），或在对话里直接发给模型。</div>' : ''}
         </div>
         <div class="field">
-          <label>JOB · 目标岗位 JD</label>
+          <label>JOB · 目标岗位 JD <a class="more-link" href="#/add-job">+ 新增</a></label>
           <select id="start-job">${sel(c.jobs, noJob ? '（还没有 JD 档案）' : '选择岗位…')}</select>
-          ${noJob ? '<div class="hint">还没有 JD 档案：把招聘页全文粘贴给模型，它会 save_job 归档后再来。</div>' : ''}
+          ${noJob ? '<div class="hint">还没有 JD 档案：去<a href="#/add-job">新增岗位</a>粘贴招聘页全文，或发给模型让它归档。</div>' : ''}
         </div>
         <div class="field">
           <label>PROMPT · 分析草稿预览</label>
           <div class="prompt-preview" id="start-preview"></div>
         </div>
-        <div><button class="btn accent" id="start-go" ${noResume || noJob ? 'disabled' : ''}>${ic('spark')}开新对话发起分析</button></div>
+        <div><button class="btn accent" id="start-go" ${noResume || noJob ? 'disabled' : ''}>${ic('spark')}<span id="start-go-label">开新对话发起分析</span></button></div>
+        <div class="hint" id="start-mode-hint"></div>
       </div>`
   }
 
@@ -378,7 +512,14 @@
     const jSel = document.getElementById('start-job')
     const preview = document.getElementById('start-preview')
     const go = document.getElementById('start-go')
+    const label = document.getElementById('start-go-label')
+    const hint = document.getElementById('start-mode-hint')
     if (!rSel || !jSel) return
+    const EMBEDDED = (() => { try { return window.parent !== window } catch { return false } })()
+    if (hint) hint.textContent = EMBEDDED
+      ? '点击后宿主会开新对话并填入草稿，不会自动发送。'
+      : '当前是浏览器独立预览（未嵌入 dsh 宿主）：点击按钮会把草稿复制到剪贴板，粘贴到 dsh 对话即可；嵌入 dsh 时这里会直接开新对话。'
+    if (label) label.textContent = EMBEDDED ? '开新对话发起分析' : '复制分析草稿'
     const compose = () => {
       const r = state.catalog.resumes.find((x) => x.id === rSel.value)
       const j = state.catalog.jobs.find((x) => x.id === jSel.value)
@@ -391,22 +532,46 @@
       const r = state.catalog.resumes.find((x) => x.id === rSel.value)
       const j = state.catalog.jobs.find((x) => x.id === jSel.value)
       if (!r || !j) return
-      try {
-        parent.postMessage({ type: 'resume-matcher:start', prompt: buildPrompt(r, j) }, location.origin)
-        toast('已在新对话填入分析草稿，去检查后发送')
-      } catch (e) {
-        toast(`发起失败：${e.message}`, true)
+      const prompt = buildPrompt(r, j)
+      if (!EMBEDDED) {
+        // 独立预览回退（guizang 同款）：复制草稿
+        navigator.clipboard?.writeText(prompt).then(
+          () => toast('草稿已复制到剪贴板——粘贴到 dsh 对话即可开始分析'),
+          () => toast('复制失败，请从上方预览手动复制', true))
+        return
       }
+      // 嵌入宿主：postMessage + start-ok / start-failed 握手
+      let done = false
+      const cleanup = () => { done = true; clearTimeout(timer); removeEventListener('message', onMsg) }
+      const onMsg = (e) => {
+        if (e.origin !== location.origin) return
+        if (e.data?.type === 'resume-matcher:start-ok') { if (!done) { cleanup(); toast('已在宿主开新对话并填入草稿——请检查后发送') } }
+        else if (e.data?.type === 'resume-matcher:start-failed') { if (!done) { cleanup(); toast(`没能开新对话：${e.data.message || ''}`, true) } }
+      }
+      const timer = setTimeout(() => { if (!done) { cleanup(); copyFallback(prompt, '未收到宿主确认') } }, 1500)
+      addEventListener('message', onMsg)
+      parent.postMessage({ type: 'resume-matcher:start', prompt }, location.origin)
     }
   }
 
+  function copyFallback(prompt, reason) {
+    navigator.clipboard?.writeText(prompt).then(
+      () => toast(`${reason}，草稿已复制到剪贴板——请粘贴到 dsh 对话`, true),
+      () => toast(`${reason}，复制也失败了，请从预览手动复制`, true))
+  }
+
   function buildPrompt(r, j) {
+    // 面板新增的档案通常没做结构化抽取：让模型先补齐再分析（用 save_resume/save_job 的 upsert 回填，不建重复档案）
+    const needs = []
+    if (!r.processed_at) needs.push(`- 简历档案 ${r.id} 还没做结构化抽取：按 hr-critic 技能 Step 1 的 schema 抽取后，用 resume_matcher(action="save_resume", resumeId="${r.id}", processedJson=<JSON 字符串>) 回填`)
+    if (!j.processed_at) needs.push(`- JD 档案 ${j.id} 还没做结构化抽取：按 hr-critic 技能 Step 2 的 schema 抽取后，用 resume_matcher(action="save_job", jobId="${j.id}", processedJson=<JSON 字符串>) 回填`)
     return [
       '请用 hr-critic 技能做简历深度分析：',
       `- 简历档案：${r.id}（${r.title}）`,
       `- JD 档案：${j.id}（${j.title}）`,
       '',
-      `先用 resume_matcher 工具分别 get 这两条档案拿原文，然后按五步框架（第一印象/地毯式审计/修改蓝图/重写简历/最终裁决）产出完整中文报告，`,
+      ...(needs.length ? ['先补齐结构化信息：', ...needs, ''] : []),
+      `然后用 resume_matcher 工具分别 get 这两条档案拿原文，按五步框架（第一印象/地毯式审计/修改蓝图/重写简历/最终裁决）产出完整中文报告，`,
       `最后用 resume_matcher(action="archive_report", resumeId="${r.id}", jobId="${j.id}", reportMd=<报告全文>) 存档，并把报告全文完整输出给我。`,
     ].join('\n')
   }
@@ -484,6 +649,7 @@
       }
     })
     bindStart()
+    bindAdd()
   }
 
   // ---------- 路由 ----------
@@ -499,8 +665,8 @@
     $app.classList.toggle('bare', Boolean(me))
     document.querySelectorAll('.nav a').forEach((a) => {
       const cur = hash === '#/' ? 'home' : hash.startsWith('#/start') ? 'start'
-        : hash.startsWith('#/resumes') || m ? 'resumes'
-        : hash.startsWith('#/jobs') || mj ? 'jobs'
+        : hash.startsWith('#/resumes') || hash.startsWith('#/add-resume') || m ? 'resumes'
+        : hash.startsWith('#/jobs') || hash.startsWith('#/add-job') || mj ? 'jobs'
         : hash.startsWith('#/reports') || hash.startsWith('#/report/') || hash.startsWith('#/editor/') || mr || me ? 'reports' : 'home'
       a.classList.toggle('on', a.dataset.view === cur)
     })
@@ -509,7 +675,9 @@
     if (mr) return viewReport(mr[1])
     if (me) return viewEditor(me[1])
     if (hash.startsWith('#/resumes')) $app.innerHTML = viewResumes()
+    else if (hash.startsWith('#/add-resume')) $app.innerHTML = viewAddResume()
     else if (hash.startsWith('#/jobs')) $app.innerHTML = viewJobs()
+    else if (hash.startsWith('#/add-job')) $app.innerHTML = viewAddJob()
     else if (hash.startsWith('#/reports')) $app.innerHTML = viewReports()
     else if (hash.startsWith('#/start')) $app.innerHTML = viewStart()
     else $app.innerHTML = viewHome()
