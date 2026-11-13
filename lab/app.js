@@ -337,6 +337,17 @@
         }
         const open = document.getElementById('a4cv-open')
         if (open) open.onclick = () => {
+          // 桌面端 WebContentsView 会 deny window.open，新窗口点了没反应：
+          // 面板里已经内嵌同一个编辑器（#a4cv-frame），这里只做提示，不假装能开新窗口
+          const embedded = (() => { try { return window.parent !== window } catch { return false } })()
+          if (embedded) {
+            const tip = document.createElement('div')
+            tip.textContent = '桌面端不支持弹出新窗口——左侧就是同一个 a4cv 编辑器，直接在这里改；需要浏览器窗口请在网页版 dsh 打开。'
+            tip.style.cssText = 'position:fixed;left:50%;top:24px;transform:translateX(-50%);z-index:9999;max-width:520px;padding:10px 14px;border-radius:8px;background:#1f2430;color:#fff;font-size:13px;line-height:1.6;box-shadow:0 8px 24px rgba(0,0,0,.28)'
+            document.body.appendChild(tip)
+            setTimeout(() => tip.remove(), 4200)
+            return
+          }
           try { window.open(`/resume-matcher/a4cv/index.html?md=${encodeURIComponent(md)}`, '_blank') } catch {}
         }
       }]
